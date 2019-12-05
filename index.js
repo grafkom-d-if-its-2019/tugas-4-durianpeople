@@ -1,251 +1,229 @@
-/// <reference path="libs/glUtils.js" />
-/// <reference path="libs/signals.js" />
+(function() {
 
-function quattomatrix(quat) { // output: matrix 3x3
-	var w = quat[3];
-	var x = quat[0];
-	var y = quat[1];
-	var z = quat[2];
+  glUtils.SL.init({ callback: function() { main(); }});
+  function main() {
+    var canvas = document.getElementById("glcanvas");
+    var gl = glUtils.checkWebGL(canvas);
+    var vertexShader = glUtils.getShader(gl, gl.VERTEX_SHADER, glUtils.SL.Shaders.v1.vertex);
+    var fragmentShader = glUtils.getShader(gl, gl.FRAGMENT_SHADER, glUtils.SL.Shaders.v1.fragment);
+    var vertexShader2 = glUtils.getShader(gl, gl.VERTEX_SHADER, glUtils.SL.Shaders.v2.vertex);
+    var fragmentShader2 = glUtils.getShader(gl, gl.FRAGMENT_SHADER, glUtils.SL.Shaders.v2.fragment);
+    var program = glUtils.createProgram(gl, vertexShader2, fragmentShader2);
+    // var program2 = glUtils.createProgram(gl, vertexShader2, fragmentShader2);
+    gl.useProgram(program);
 
-	var n = w * w + x * x + y * y + z * z;
-	var s = n === 0 ? 0 : 2 / n;
-	var wx = s * w * x, wy = s * w * y, wz = s * w * z;
-	var xx = s * x * x, xy = s * x * y, xz = s * x * z;
-	var yy = s * y * y, yz = s * y * z, zz = s * z * z;
+    // Mendefinisikan verteks-verteks
+    var vertices = [];
+    var cubePoints = [
+      [ -0.5, -0.5,  0.5 ],
+      [ -0.5,  0.5,  0.5 ],
+      [  0.5,  0.5,  0.5 ],
+      [  0.5, -0.5,  0.5 ],
+      [ -0.5, -0.5, -0.5 ],
+      [ -0.5,  0.5, -0.5 ],
+      [  0.5,  0.5, -0.5 ],
+      [  0.5, -0.5, -0.5 ]
+    ];
+    var cubeColors = [
+      [],
+      [1.0, 0.0, 0.0], // merah
+      [0.0, 1.0, 0.0], // hijau
+      [0.0, 0.0, 1.0], // biru
+      [1.0, 1.0, 1.0], // putih
+      [1.0, 0.5, 0.0], // oranye
+      [1.0, 1.0, 0.0], // kuning
+      []
+    ];
+    var cubeNormals = [
+      [],
+      [  0.0,  0.0,  1.0 ], // depan
+      [  1.0,  0.0,  0.0 ], // kanan
+      [  0.0, -1.0,  0.0 ], // bawah
+      [  0.0,  0.0, -1.0 ], // belakang
+      [ -1.0,  0.0,  0.0 ], // kiri
+      [  0.0,  1.0,  0.0 ], // atas
+      []
+    ];
+    function quad(a, b, c, d) {
+      var indices = [a, b, c, a, c, d];
+      for (var i=0; i < indices.length; i++) {
+        for (var j=0; j < 3; j++) {
+          vertices.push(cubePoints[indices[i]][j]);
+        }
+        for (var j=0; j < 3; j++) {
+          vertices.push(cubeColors[a][j]);
+        }
+        for (var j=0; j < 3; j++) {
+          vertices.push(cubeNormals[a][j]);
+        }
+        switch (indices[i]) {
+          case a:
+            vertices.push(0.0);
+            vertices.push(0.0);
+            break;
+          case b:
+            vertices.push(0.0);
+            vertices.push(1.0);
+            break;
+          case c:
+            vertices.push(1.0);
+            vertices.push(1.0);
+            break;
+          case d:
+            vertices.push(1.0);
+            vertices.push(0.0);
+            break;
+        
+          default:
+            break;
+        }
+      }
+    }
+    quad(1, 0, 3, 2);
+    quad(2, 3, 7, 6);
+    quad(3, 0, 4, 7);
+    quad(4, 5, 6, 7);
+    quad(5, 4, 0, 1);
+    quad(6, 5, 1, 2);
 
-	return [
-	  1 - (yy + zz), xy - wz, xz + wy,
-	  xy + wz, 1 - (xx + zz), yz - wx,
-	  xz - wy, yz + wx, 1 - (xx + yy)];
-}
+    console.log(vertices.length);
+    console.log(vertices);
 
-function threetofour(input) {
-	return [
-		input[0],input[3],input[6], 0.0,
-		input[1],input[4],input[7], 0.0,
-		input[2],input[5],input[8], 0.0,
-		0.0, 0.0, 0.0, 1.0,
-	];
-}
+    // Membuat vertex buffer object (CPU Memory <==> GPU Memory)
+    var vertexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBufferObject);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
+    // Membuat sambungan untuk attribute
+    var vPosition = gl.getAttribLocation(program, 'vPosition');
+    // var vColor = gl.getAttribLocation(program, 'vColor');
+    var vNormal = gl.getAttribLocation(program, 'vNormal');
+    var vTexCoord = gl.getAttribLocation(program, 'vTexCoord');
+    gl.vertexAttribPointer(
+      vPosition,    // variabel yang memegang posisi attribute di shader
+      3,            // jumlah elemen per atribut
+      gl.FLOAT,     // tipe data atribut
+      gl.FALSE, 
+      11 * Float32Array.BYTES_PER_ELEMENT, // ukuran byte tiap verteks (overall) 
+      0                                   // offset dari posisi elemen di array
+    );
+    // gl.vertexAttribPointer(vColor, 3, gl.FLOAT, gl.FALSE,
+      // 11 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, gl.FALSE,
+      11 * Float32Array.BYTES_PER_ELEMENT, 6 * Float32Array.BYTES_PER_ELEMENT);
+    gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, gl.FALSE,
+      11 * Float32Array.BYTES_PER_ELEMENT, 9 * Float32Array.BYTES_PER_ELEMENT);
+    gl.enableVertexAttribArray(vPosition);
+    // gl.enableVertexAttribArray(vColor);
+    gl.enableVertexAttribArray(vNormal);
+    gl.enableVertexAttribArray(vTexCoord);
 
-(function () {
-	var sl = new SL({ callback: function () { main(); } });
-	function main() {
-		/** @type {HTMLCanvasElement} */
-		var canvas = document.getElementById("glcanvas");
-		var gl = glUtils.checkWebGL(canvas);
+    // Membuat sambungan untuk uniform
+    var thetaUniformLocation = gl.getUniformLocation(program, 'theta');
+    var theta = 0;
+    var thetaSpeed = 0.0;
+    var axis = [true, true, true];
+    var x = 0;
+    var y = 1;
+    var z = 2;
 
-		var vertexShader = glUtils.getShader(gl, gl.VERTEX_SHADER, sl.Shaders.v1.vertex);
-		var fragmentShader = glUtils.getShader(gl, gl.FRAGMENT_SHADER, sl.Shaders.v1.fragment);
-		var program = glUtils.createProgram(gl, vertexShader, fragmentShader);
-		gl.useProgram(program);
+    // Definisi untuk matriks model
+    var mmLoc = gl.getUniformLocation(program, 'modelMatrix');
+    var mm = glMatrix.mat4.create();
+    glMatrix.mat4.translate(mm, mm, [0.0, 0.0, -2.0]);
 
-		{ // UNIFORM LOCATION
-			var modelMatrixLocation = gl.getUniformLocation(program, 'modelMatrix');
-			var viewMatrixLocation = gl.getUniformLocation(program, 'viewMatrix');
-			var projectionMatrixLocation = gl.getUniformLocation(program, 'projectionMatrix');
-		}
+    // Definisi untuk matrix view dan projection
+    var vmLoc = gl.getUniformLocation(program, 'viewMatrix');
+    var vm = glMatrix.mat4.create();
+    var pmLoc = gl.getUniformLocation(program, 'projectionMatrix');
+    var pm = glMatrix.mat4.create();
+    var camera = {x: 0.0, y: 0.0, z:0.0};
+    glMatrix.mat4.perspective(pm,
+      glMatrix.glMatrix.toRadian(90), // fovy dalam radian
+      canvas.width/canvas.height,     // aspect ratio
+      0.5,  // near
+      10.0, // far  
+    );
+    gl.uniformMatrix4fv(pmLoc, false, pm);
 
-		{ // OBJECT DEFINITION
-			var vertices = [];
-			var cubePoints = [
-				[-1.0, -1.0, 1.0],
-				[-1.0, 1.0, 1.0],
-				[1.0, 1.0, 1.0],
-				[1.0, -1.0, 1.0],
-				[-1.0, -1.0, -1.0],
-				[-1.0, 1.0, -1.0],
-				[1.0, 1.0, -1.0],
-				[1.0, -1.0, -1.0]
-			];
-			var cubeColors = [
-				[1.0, 1.0, 1.0],
-				[1.0, 0.0, 0.0], // merah
-				[0.0, 1.0, 0.0], // hijau
-				[0.0, 0.0, 1.0], // biru
-				[1.0, 1.0, 1.0], // putih
-				[1.0, 0.5, 0.0], // oranye
-				[1.0, 1.0, 0.0], // kuning
-				[0.5, 0.5, 0.5],
-			];
-			function quad(a, b, c, d) {
-				var indices = [a, b, c, d];
-				for (var i = 0; i < indices.length; i++) {
-					for (var j = 0; j < 3; j++) {
-						vertices.push(cubePoints[indices[i]][j]);
-					}
-					for (var j = 0; j < 3; j++) {
-						vertices.push(cubeColors[a][j]);
-					}
-				}
-			}
+    // Uniform untuk pencahayaan
+    var dcLoc = gl.getUniformLocation(program, 'diffuseColor');
+    var dc = glMatrix.vec3.fromValues(1.0, 1.0, 1.0);  // rgb
+    gl.uniform3fv(dcLoc, dc);
+    var ddLoc = gl.getUniformLocation(program, 'diffusePosition');
+    var dd = glMatrix.vec3.fromValues(1., 2., 1.7);  // xyz
+    gl.uniform3fv(ddLoc, dd);
+    var acLoc = gl.getUniformLocation(program, 'ambientColor');
+    var ac = glMatrix.vec3.fromValues(0.2, 0.2, 0.2);
+    gl.uniform3fv(acLoc, ac);
 
-			quad(1, 0, 0, 3);
-			quad(3, 2, 2, 1);
-			quad(5, 4, 4, 7);
-			quad(7, 6, 6, 5);
-			quad(1, 5, 2, 6);
-			quad(0, 4, 3, 7);
+    // Uniform untuk modelMatrix vektor normal
+    var nmLoc = gl.getUniformLocation(program, 'normalMatrix');
 
+    // Kontrol menggunakan keyboard
+    function onKeyDown(event) {
+      if (event.keyCode == 189) thetaSpeed -= 0.01;       // key '-'
+      else if (event.keyCode == 187) thetaSpeed += 0.01;  // key '='
+      else if (event.keyCode == 48) thetaSpeed = 0;       // key '0'
+      if (event.keyCode == 88) axis[x] = !axis[x];
+      if (event.keyCode == 89) axis[y] = !axis[y];
+      if (event.keyCode == 90) axis[z] = !axis[z];
+      if (event.keyCode == 38) camera.z -= 0.1;
+      else if (event.keyCode == 40) camera.z += 0.1;
+      if (event.keyCode == 37) camera.x -= 0.1;
+      else if (event.keyCode == 39) camera.x += 0.1;
+    }
+    document.addEventListener('keydown', onKeyDown);
 
-			var cubeModelMatrix = glMatrix.mat4.create();
+    function render() {
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-			var w_fill = new Float32Array([
-				-0.49891469942, 0.404953571, 0.0, 1.0, 0.0, 0.0, // A
-				-0.2936433668434, 0.40429267676999997, 0.0, 1.0, 0.0, 0.0, // B
-				-0.3314953957192, -0.2932661410845, 0.0, 1.0, 0.0, 0.0, // C
-				-0.15305011673320001, -0.10400599670539999, 0.0, 1.0, 0.0, 0.0, // E
-				-0.15305011673320001, -0.2932661410845, 0.0, 1.0, 0.0, 0.0, // D
-				0.0029505660734999717, -0.15808032367080002, 0.0, 1.0, 0.0, 0.0, // G
-				-0.15305011673320001, -0.10400599670539999, 0.0, 1.0, 0.0, 0.0, // E
-				-0.001642001229899992, 0.0311798207083, 0.0, 1.0, 0.0, 0.0, // F
-				0.0029505660734999717, -0.15808032367080002, 0.0, 1.0, 0.0, 0.0, // G
-				0.14976611427340003, -0.0956357274915, 0.0, 1.0, 0.0, 0.0, // H
-				0.16058097966649998, -0.2878587083879, 0.0, 1.0, 0.0, 0.0, // I
-				0.3206559894387, -0.2878587083879, 0.0, 1.0, 0.0, 0.0, // L
-				0.14976611427340003, -0.0956357274915, 0.0, 1.0, 0.0, 0.0, // H
-				0.32280396056289995, 0.39347781137689997, 0.0, 1.0, 0.0, 0.0, // J
-				0.3206559894387, -0.2878587083879, 0.0, 1.0, 0.0, 0.0, // L
-				0.50108530058, 0.404953571, 0.0, 1.0, 0.0, 0.0, // K
-			]);
+      theta += thetaSpeed;
+      if (axis[z]) glMatrix.mat4.rotateZ(mm, mm, thetaSpeed);
+      if (axis[y]) glMatrix.mat4.rotateY(mm, mm, thetaSpeed);
+      if (axis[x]) glMatrix.mat4.rotateX(mm, mm, thetaSpeed);
+      gl.uniformMatrix4fv(mmLoc, false, mm);
 
+      // Perhitungan modelMatrix untuk vektor normal
+      var nm = glMatrix.mat3.create();
+      glMatrix.mat3.normalFromMat4(nm, mm);
+      gl.uniformMatrix3fv(nmLoc, false, nm);
 
-			var w_fill_ModelMatrix = glMatrix.mat4.create();
-			var w_fill_ModelMatrixQuat = glMatrix.quat.create();
+      glMatrix.mat4.lookAt(vm,
+        [camera.x, camera.y, camera.z], // di mana posisi kamera (posisi)
+        [0.0, 0.0, -2.0], // ke mana kamera menghadap (vektor)
+        [0.0, 1.0, 0.0]  // ke mana arah atas kamera (vektor)
+      );
+      gl.uniformMatrix4fv(vmLoc, false, vm);
 
-		}
+      gl.drawArrays(gl.TRIANGLES, 0, 36);
+      requestAnimationFrame(render);
+    }
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.enable(gl.DEPTH_TEST);
 
-		{ // VARIABLES
-			var loc_track = [0.0, 0.0, -2.2];
-			var trajectory = [0.05, 0.02, 0.07];
-			var traj_direction = [1, 1, 1];
-		}
+    // Uniform untuk tekstur
+    var sampler0Loc = gl.getUniformLocation(program, 'sampler0');
+    gl.uniform1i(sampler0Loc, 0);
 
-		{ // PROJECTION SETUP
-			var projectionMatrix = glMatrix.mat4.create();
-			glMatrix.mat4.perspective(projectionMatrix,
-				glMatrix.glMatrix.toRadian(90),
-				canvas.width / canvas.height,
-				0.5,
-				10.0,
-			);
-			gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix);
-		}
+    // Create a texture.
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    
+    // Fill the texture with a 1x1 blue pixel.
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                  new Uint8Array([0, 0, 255, 255]));
+    
+    // Asynchronously load an image
+    var image = new Image();
+    image.src = "images/txStainglass.bmp";
+    image.addEventListener('load', function() {
+      // Now that the image has loaded make copy it to the texture.
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, image);
+      gl.generateMipmap(gl.TEXTURE_2D);
+    });
 
-		{ // RENDER
-
-			{ // PROJECTION SETUP
-				var viewMatrix = glMatrix.mat4.create();
-				glMatrix.mat4.lookAt(viewMatrix,
-					[0.0, 0.0, 0.0],
-					[0.0, 0.0, -2.0],
-					[0.0, 1.0, 0.0]
-				);
-				gl.uniformMatrix4fv(viewMatrixLocation, false, viewMatrix);
-			}
-
-			// Move object once
-			glMatrix.mat4.translate(cubeModelMatrix, cubeModelMatrix, [0.0, 0.0, -2.2]);
-			var translatemat=glMatrix.mat4.create()
-			glMatrix.mat4.fromTranslation(translatemat, [0.0, 0.0, -2.2]);
-			glMatrix.quat.rotateY(w_fill_ModelMatrixQuat, w_fill_ModelMatrixQuat, 45/180*Math.PI);
-
-			function render() {
-				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-				glUtils.draw(gl, program, gl.LINES, new Float32Array(vertices), 6 * Float32Array.BYTES_PER_ELEMENT, function (gl) {
-					var vPosition = gl.getAttribLocation(program, 'vPosition');
-					var vColor = gl.getAttribLocation(program, 'vColor');
-					gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, gl.FALSE, 6 * Float32Array.BYTES_PER_ELEMENT, 0);
-					gl.vertexAttribPointer(vColor, 3, gl.FLOAT, gl.FALSE, 6 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
-					gl.enableVertexAttribArray(vPosition);
-					gl.enableVertexAttribArray(vColor);
-					gl.uniformMatrix4fv(modelMatrixLocation, false, cubeModelMatrix);
-					return gl;
-				});
-
-				{
-					// Collision check
-
-					glMatrix.mat4.translate(translatemat, translatemat, 
-						[traj_direction[0] * trajectory[0], traj_direction[1] * trajectory[1], traj_direction[2] * trajectory[2]]);
-
-					var blankvec4 = glMatrix.vec4.create();
-					let flag = 0;
-					let did = 0;
-					debugger;
-					let quat4tmp = threetofour(quattomatrix(w_fill_ModelMatrixQuat));
-					for (let i = 0; i < 16; i++) {
-						glMatrix.vec4.set(blankvec4, w_fill[6 * i + 0], w_fill[6 * i + 1], w_fill[6 * i + 2], 1.0);
-						var used_vec = glMatrix.vec4.create();
-						let transtmp = glMatrix.mat4.create();
-						glMatrix.mat4.multiply(transtmp, translatemat, quat4tmp);
-						glMatrix.vec4.transformMat4(used_vec, blankvec4, transtmp);
-						if ((used_vec[0] > 0.9 || used_vec[0] < -0.9)) {
-							
-							debugger;
-							flag |= 1;
-							traj_direction[0] = (used_vec[0] > 0.9) ? -1 : 1;
-							debugger;1
-							break;
-						}
-					}
-					for (let i = 0; i < 16; i++) {
-						glMatrix.vec4.set(blankvec4, w_fill[6 * i + 0], w_fill[6 * i + 1], w_fill[6 * i + 2], 1.0);
-						var used_vec = glMatrix.vec4.create();
-						let transtmp = glMatrix.mat4.create();
-						glMatrix.mat4.multiply(transtmp, translatemat, quat4tmp);
-						glMatrix.vec4.transformMat4(used_vec, blankvec4, transtmp);
-						if ((used_vec[1] > 0.9 || used_vec[1] < -0.9)) {
-							
-							debugger;
-							flag |= 2;
-							traj_direction[1] = (used_vec[1] > 0.9) ? -1 : 1;
-							debugger;1
-							break;
-						}
-					}
-					for (let i = 0; i < 16; i++) {
-						glMatrix.vec4.set(blankvec4, w_fill[6 * i + 0], w_fill[6 * i + 1], w_fill[6 * i + 2], 1.0);
-						var used_vec = glMatrix.vec4.create();
-						let transtmp = glMatrix.mat4.create();
-						glMatrix.mat4.multiply(transtmp, translatemat, quat4tmp);
-						glMatrix.vec4.transformMat4(used_vec, blankvec4, transtmp);
-						if ((used_vec[2] > -1.1 || used_vec[2] < -3.1)) {
-							
-							debugger;
-							flag |= 4;
-							traj_direction[2] = (used_vec[2] > -1.1) ? -1 : 1;
-							debugger;1
-							break;
-						}
-					}
-				}
-
-
-				glMatrix.quat.rotateY(w_fill_ModelMatrixQuat, w_fill_ModelMatrixQuat, 0.1);
-				
-				var w_fill_quatasmatrix = threetofour(quattomatrix(w_fill_ModelMatrixQuat));
-				var w_fill_final = glMatrix.mat4.create();
-				glMatrix.mat4.multiply(w_fill_final, translatemat, w_fill_quatasmatrix);
-				glUtils.draw(gl, program, gl.TRIANGLE_STRIP, w_fill, 6 * Float32Array.BYTES_PER_ELEMENT, function (gl) {
-					var vPosition = gl.getAttribLocation(program, 'vPosition');
-					var vColor = gl.getAttribLocation(program, 'vColor');
-					gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, gl.FALSE, 6 * Float32Array.BYTES_PER_ELEMENT, 0 * Float32Array.BYTES_PER_ELEMENT);
-					gl.vertexAttribPointer(vColor, 3, gl.FLOAT, gl.FALSE, 6 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
-					gl.enableVertexAttribArray(vPosition);
-					gl.enableVertexAttribArray(vColor);
-					gl.uniformMatrix4fv(modelMatrixLocation, false, w_fill_final);
-					return gl;
-				});
-
-				requestAnimationFrame(render);
-			}
-
-			gl.clearColor(0.0, 0.0, 0.0, 1.0);
-			gl.enable(gl.DEPTH_TEST);
-			render();
-		}
-	}
+    render();
+  }
 })();
